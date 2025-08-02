@@ -8,9 +8,9 @@ let data = ["", "", "", "", "", "", "", "", ""];
 const TicTacToe = () => {
     const [count, setCount] = React.useState(0);
     const [lock, setLock] = React.useState(false);
+    const [mode, setMode] = React.useState("pvp");
     const titleRef = React.useRef(null);
 
-    // ინდივიდუალური useRef-ები
     const box1 = React.useRef(null);
     const box2 = React.useRef(null);
     const box3 = React.useRef(null);
@@ -24,23 +24,87 @@ const TicTacToe = () => {
     const boxRefs = [box1, box2, box3, box4, box5, box6, box7, box8, box9];
 
     const toggle = (e, num) => {
-        if (lock || data[num] !== "") {
-            return;
-        }
+        if (lock || data[num] !== "") return;
 
         if (count % 2 === 0) {
             e.target.innerHTML = `<img src='${cross_icon}' alt='X' />`;
             data[num] = "x";
-        } else {
+            setCount(prev => prev + 1);
+            const result = checkwin();
+
+            if (mode === "ai" && !result) {
+                setTimeout(() => {
+                    makeBestAIMove();
+                }, 300);
+            }
+        } else if (mode === "pvp") {
             e.target.innerHTML = `<img src='${circle_icon}' alt='O' />`;
             data[num] = "o";
+            setCount(prev => prev + 1);
+            checkwin();
         }
-
-        setCount(prev => prev + 1);
-        checkwin();
     };
 
-    const checkwin = () => {
+    const makeBestAIMove = () => {
+        if (lock) return;
+
+        let bestScore = -Infinity;
+        let move = -1;
+
+        for (let i = 0; i < 9; i++) {
+            if (data[i] === "") {
+                data[i] = "o";
+                let score = minimax(data, 0, false);
+                data[i] = "";
+                if (score > bestScore) {
+                    bestScore = score;
+                    move = i;
+                }
+            }
+        }
+
+        if (move !== -1) {
+            data[move] = "o";
+            boxRefs[move].current.innerHTML = `<img src='${circle_icon}' alt='O' />`;
+            setCount(prev => prev + 1);
+            checkwin();
+        }
+    };
+
+    const minimax = (board, depth, isMaximizing) => {
+        const winner = checkSimulatedWin(board);
+        if (winner !== null) {
+            if (winner === "x") return -10 + depth;
+            if (winner === "o") return 10 - depth;
+            if (winner === "draw") return 0;
+        }
+
+        if (isMaximizing) {
+            let bestScore = -Infinity;
+            for (let i = 0; i < 9; i++) {
+                if (board[i] === "") {
+                    board[i] = "o";
+                    let score = minimax(board, depth + 1, false);
+                    board[i] = "";
+                    bestScore = Math.max(score, bestScore);
+                }
+            }
+            return bestScore;
+        } else {
+            let bestScore = Infinity;
+            for (let i = 0; i < 9; i++) {
+                if (board[i] === "") {
+                    board[i] = "x";
+                    let score = minimax(board, depth + 1, true);
+                    board[i] = "";
+                    bestScore = Math.min(score, bestScore);
+                }
+            }
+            return bestScore;
+        }
+    };
+
+    const checkSimulatedWin = (board) => {
         const wins = [
             [0, 1, 2],
             [3, 4, 5],
@@ -54,15 +118,26 @@ const TicTacToe = () => {
 
         for (let combo of wins) {
             const [a, b, c] = combo;
-            if (data[a] && data[a] === data[b] && data[b] === data[c]) {
-                won(data[a]);
-                return;
+            if (board[a] && board[a] === board[b] && board[b] === board[c]) {
+                return board[a]; // "x" or "o"
             }
         }
 
-        if (!data.includes("")) {
+        if (!board.includes("")) return "draw";
+
+        return null;
+    };
+
+    const checkwin = () => {
+        const result = checkSimulatedWin(data);
+        if (result === "x" || result === "o") {
+            won(result);
+            return result;
+        } else if (result === "draw") {
             draw();
+            return "draw";
         }
+        return null;
     };
 
     const won = (winner) => {
@@ -85,9 +160,26 @@ const TicTacToe = () => {
         setCount(0);
     };
 
+    const handleModeChange = (newMode) => {
+        reset();
+        setMode(newMode);
+    };
+
     return (
         <div className="container">
             <h1 className="title" ref={titleRef}>TIC TAC TOE In <span>React</span></h1>
+
+            <div className="mode-buttons">
+                <button
+                    className={mode === "pvp" ? "active-mode" : ""}
+                    onClick={() => handleModeChange("pvp")}
+                >Play vs Friend</button>
+                <button
+                    className={mode === "ai" ? "active-mode" : ""}
+                    onClick={() => handleModeChange("ai")}
+                >Play vs AI</button>
+            </div>
+
             <div className="board">
                 <div className="row1">
                     <div className="boxes" ref={box1} onClick={(e) => toggle(e, 0)}></div>
@@ -105,6 +197,7 @@ const TicTacToe = () => {
                     <div className="boxes" ref={box9} onClick={(e) => toggle(e, 8)}></div>
                 </div>
             </div>
+
             <button className="reset" onClick={reset}>Reset</button>
         </div>
     );
